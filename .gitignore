@@ -65,8 +65,13 @@ apps/ios/*.mobileprovision
 # Local untracked files
 .local/
 .vscode/
+# Note: this fork includes workspace templates under workspace/.
+# Keep ignoring root-level IDENTITY.md/USER.md, but do not ignore workspace/ copies.
 IDENTITY.md
 USER.md
+
+!workspace/IDENTITY.md
+!workspace/USER.md
 .tgz
 
 # local tooling
