@@ -1,13 +1,16 @@
 import { normalizeCommandBody } from "./commands-registry.js";
 
-export type GroupActivationMode = "mention" | "always";
+export type GroupActivationMode = "mention" | "soft" | "always";
 
 export function normalizeGroupActivation(raw?: string | null): GroupActivationMode | undefined {
   const value = raw?.trim().toLowerCase();
-  if (value === "mention") {
+  if (value === "mention" || value === "hard") {
     return "mention";
   }
-  if (value === "always") {
+  if (value === "soft") {
+    return "soft";
+  }
+  if (value === "always" || value === "none") {
     return "always";
   }
   return undefined;
@@ -25,7 +28,7 @@ export function parseActivationCommand(raw?: string): {
     return { hasCommand: false };
   }
   const normalized = normalizeCommandBody(trimmed);
-  const match = normalized.match(/^\/activation(?:\s+([a-zA-Z]+))?\s*$/i);
+  const match = normalized.match(/^\/activation(?:\s+([a-zA-Z]+))?(?:\s+.*)?$/i);
   if (!match) {
     return { hasCommand: false };
   }

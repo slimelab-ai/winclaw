@@ -76,7 +76,7 @@ export const handleActivationCommand: CommandHandler = async (params, allowTextC
   if (!activationCommand.mode) {
     return {
       shouldContinue: false,
-      reply: { text: "⚙️ Usage: /activation mention|always" },
+      reply: { text: "⚙️ Usage: /activation mention|soft|always" },
     };
   }
   if (params.sessionEntry && params.sessionStore && params.sessionKey) {

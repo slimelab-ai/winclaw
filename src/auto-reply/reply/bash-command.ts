@@ -66,11 +66,6 @@ function parseBashRequest(raw: string): BashRequest | null {
       return null;
     }
     restSource = match[1] ?? "";
-  } else if (trimmed.startsWith("!")) {
-    restSource = trimmed.slice(1);
-    if (restSource.trimStart().startsWith(":")) {
-      restSource = restSource.trimStart().slice(1);
-    }
   } else {
     return null;
   }

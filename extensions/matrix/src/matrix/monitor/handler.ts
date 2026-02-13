@@ -35,6 +35,39 @@ import { resolveMatrixRoomConfig } from "./rooms.js";
 import { resolveMatrixThreadRootId, resolveMatrixThreadTarget } from "./threads.js";
 import { EventType, RelationType } from "./types.js";
 
+const matrixActivationOverrides = new Map<string, "mention" | "soft" | "always">();
+
+function parseMatrixActivationCommand(text: string): "mention" | "soft" | "always" | null {
+  const m = text.trim().match(/^\/activation(?:\s*:\s*|\s+)(mention|soft|always|hard|none)(?:\s+.*)?$/i);
+  if (!m) return null;
+  const v = (m[1] || "").toLowerCase();
+  if (v === "mention" || v === "hard") return "mention";
+  if (v === "soft") return "soft";
+  if (v === "always" || v === "none") return "always";
+  return null;
+}
+
+function resolveMatrixMentionMode(roomId: string): "mention" | "soft" | "always" {
+  const runtime = matrixActivationOverrides.get(roomId);
+  if (runtime) return runtime;
+  const raw = process.env.OPENCLAW_MENTION_MODE_OVERRIDES;
+  const defaultRaw = (process.env.OPENCLAW_MENTION_MODE_DEFAULT || "hard").toLowerCase();
+  const normalize = (v?: string) => {
+    const t = (v || "").trim().toLowerCase();
+    if (t === "soft") return "soft" as const;
+    if (t === "always" || t === "none") return "always" as const;
+    return "mention" as const;
+  };
+  try {
+    if (raw) {
+      const obj = JSON.parse(raw) as Record<string, string>;
+      const o = obj[`matrix:${roomId}`] ?? obj[roomId] ?? obj["matrix:*"] ?? obj["*"];
+      if (o) return normalize(o);
+    }
+  } catch {}
+  return normalize(defaultRaw);
+}
+
 export type MatrixMonitorHandlerParams = {
   client: MatrixClient;
   core: {
@@ -373,6 +406,23 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
         text: bodyText,
         mentionRegexes,
       });
+      const mentionMode = resolveMatrixMentionMode(roomId);
+      const softRegexHit = (() => {
+        try {
+          const rx = process.env.OPENCLAW_MENTION_REGEX;
+          return typeof rx === "string" && rx.trim().length > 0
+            ? new RegExp(rx, "i").test(bodyText)
+            : false;
+        } catch {
+          return false;
+        }
+      })();
+      const effectiveWasMentioned =
+        mentionMode === "mention"
+          ? hasExplicitMention
+          : mentionMode === "soft"
+            ? hasExplicitMention || softRegexHit
+            : true;
       const allowTextCommands = core.channel.commands.shouldHandleTextCommands({
         cfg,
         surface: "matrix",
@@ -407,6 +457,12 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
         hasControlCommand: hasControlCommandInMessage,
       });
       const commandAuthorized = commandGate.commandAuthorized;
+      const activationMode = parseMatrixActivationCommand(bodyText);
+      if (isRoom && activationMode && commandAuthorized) {
+        matrixActivationOverrides.set(roomId, activationMode);
+        logger.info({ roomId, activationMode }, "matrix activation override set");
+        return;
+      }
       if (isRoom && commandGate.shouldBlock) {
         logInboundDrop({
           log: logVerboseMessage,
@@ -416,7 +472,7 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
         });
         return;
       }
-      const shouldRequireMention = isRoom
+      const shouldRequireMentionBase = isRoom
         ? roomConfig?.autoReply === true
           ? false
           : roomConfig?.autoReply === false
@@ -425,16 +481,22 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
               ? roomConfig?.requireMention
               : true
         : false;
+      const shouldRequireMention =
+        mentionMode === "always"
+          ? false
+          : mentionMode === "mention" || mentionMode === "soft"
+            ? true
+            : shouldRequireMentionBase;
       const shouldBypassMention =
         allowTextCommands &&
         isRoom &&
         shouldRequireMention &&
-        !wasMentioned &&
+        !effectiveWasMentioned &&
         !hasExplicitMention &&
         commandAuthorized &&
         hasControlCommandInMessage;
       const canDetectMention = mentionRegexes.length > 0 || hasExplicitMention;
-      if (isRoom && shouldRequireMention && !wasMentioned && !shouldBypassMention) {
+      if (isRoom && shouldRequireMention && !effectiveWasMentioned && !shouldBypassMention) {
         logger.info({ roomId, reason: "no-mention" }, "skipping room message");
         return;
       }
@@ -495,7 +557,7 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
         GroupSystemPrompt: isRoom ? groupSystemPrompt : undefined,
         Provider: "matrix" as const,
         Surface: "matrix" as const,
-        WasMentioned: isRoom ? wasMentioned : undefined,
+        WasMentioned: isRoom ? effectiveWasMentioned : undefined,
         MessageSid: messageId,
         ReplyToId: threadTarget ? undefined : (replyToEventId ?? undefined),
         MessageThreadId: threadTarget,
