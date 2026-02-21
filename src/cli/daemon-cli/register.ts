@@ -46,6 +46,7 @@ export function registerDaemonCli(program: Command) {
     .option("--port <port>", "Gateway port")
     .option("--runtime <runtime>", "Daemon runtime (node|bun). Default: node")
     .option("--token <token>", "Gateway token (token auth)")
+    .option("--service-user <user>", "Windows service user for Scheduled Task (e.g. .\\mystery)")
     .option("--force", "Reinstall/overwrite if already installed", false)
     .option("--json", "Output JSON", false)
     .action(async (opts) => {

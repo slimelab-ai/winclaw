@@ -108,9 +108,16 @@ export async function runDaemonInstall(opts: DaemonInstallOptions) {
     config: cfg,
   });
 
+  const serviceEnv: Record<string, string | undefined> = {
+    ...process.env,
+  };
+  if (opts.serviceUser && String(opts.serviceUser).trim().length > 0) {
+    serviceEnv.OPENCLAW_WINDOWS_SERVICE_USER = String(opts.serviceUser).trim();
+  }
+
   try {
     await service.install({
-      env: process.env,
+      env: serviceEnv,
       stdout,
       programArguments,
       workingDirectory,

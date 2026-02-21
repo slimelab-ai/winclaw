@@ -41,6 +41,10 @@ function quoteCmdArg(value: string): string {
 }
 
 function resolveTaskUser(env: Record<string, string | undefined>): string | null {
+  const explicit = env.OPENCLAW_WINDOWS_SERVICE_USER?.trim();
+  if (explicit) {
+    return explicit;
+  }
   const username = env.USERNAME || env.USER || env.LOGNAME;
   if (!username) {
     return null;
