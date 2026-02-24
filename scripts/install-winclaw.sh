@@ -59,7 +59,7 @@ trim_crlf() {
   printf "%s" "$v"
 }
 
-ps_current_user="$(powershell.exe -NoProfile -Command '$u=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name; if($u -match "\\\\"){$u.Split("\\")[1]} else {$u}')"
+ps_current_user="$(powershell.exe -NoProfile -Command "\$u=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name; if(\$u -match '\\\\'){(\$u -split '\\\\')[-1]} else {\$u}")"
 current_user="$(trim_crlf "$ps_current_user")"
 if [[ -z "$current_user" ]]; then
   current_user="${USERNAME:-}"
