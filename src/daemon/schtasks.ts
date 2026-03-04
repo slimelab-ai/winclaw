@@ -288,18 +288,22 @@ export async function installScheduledTask({
     quotedScript,
   ];
   const taskUser = resolveTaskUser(env);
+  const explicitTaskUser = env.OPENCLAW_WINDOWS_SERVICE_USER?.trim();
   let create = await execSchtasks(
     taskUser ? [...baseArgs, "/RU", taskUser, "/NP", "/IT"] : baseArgs,
   );
-  if (create.code !== 0 && taskUser) {
+  if (create.code !== 0 && taskUser && !explicitTaskUser) {
     create = await execSchtasks(baseArgs);
   }
   if (create.code !== 0) {
     const detail = create.stderr || create.stdout;
+    const explicitUserHint = explicitTaskUser
+      ? ` Could not register Scheduled Task as requested user "${explicitTaskUser}".`
+      : "";
     const hint = /access is denied/i.test(detail)
       ? " Run PowerShell as Administrator or rerun without installing the daemon."
       : "";
-    throw new Error(`schtasks create failed: ${detail}${hint}`.trim());
+    throw new Error(`schtasks create failed: ${detail}${explicitUserHint}${hint}`.trim());
   }
 
   await execSchtasks(["/Run", "/TN", taskName]);
