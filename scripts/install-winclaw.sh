@@ -15,7 +15,7 @@ Behavior (Windows):
   - Attempts to run install with HOME/USERPROFILE mapped to selected user profile.
 
 Extra env overrides:
-  OPENCLAW_INSTALL_URL   Upstream install script URL (default: https://openclaw.ai/install.sh)
+  OPENCLAW_INSTALL_URL   Upstream install script URL (default: https://raw.githubusercontent.com/openclaw/openclaw/v2026.3.2/scripts/install.sh)
   WINCLAW_SERVICE_USER   Preselect/force service user (skip prompt if set)
   WINCLAW_PORT           Optional gateway port override forwarded to installer when possible
 EOF
@@ -29,7 +29,7 @@ esac
 
 if [[ "$is_windows" != true ]]; then
   echo "[WinClaw] Non-Windows environment detected; delegating to OpenClaw installer."
-  INSTALL_URL="${OPENCLAW_INSTALL_URL:-https://openclaw.ai/install.sh}"
+  INSTALL_URL="${OPENCLAW_INSTALL_URL:-https://raw.githubusercontent.com/openclaw/openclaw/v2026.3.2/scripts/install.sh}"
   curl -fsSL "$INSTALL_URL" | bash
   exit 0
 fi
@@ -135,7 +135,7 @@ if [[ -n "${WINCLAW_PORT:-}" ]]; then
   echo "[WinClaw] Gateway port override: ${WINCLAW_PORT}"
 fi
 
-INSTALL_URL="${OPENCLAW_INSTALL_URL:-https://openclaw.ai/install.sh}"
+INSTALL_URL="${OPENCLAW_INSTALL_URL:-https://raw.githubusercontent.com/openclaw/openclaw/v2026.3.2/scripts/install.sh}"
 echo "[WinClaw] Starting base install..."
 curl -fsSL "$INSTALL_URL" | bash
 

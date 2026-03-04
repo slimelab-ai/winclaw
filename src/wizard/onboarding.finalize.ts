@@ -123,8 +123,34 @@ export async function finalizeOnboardingWizard(
         "Gateway service runtime",
       );
     }
+    let windowsServiceUser: string | undefined;
+    if (process.platform === "win32") {
+      const currentUser = [process.env.USERDOMAIN, process.env.USERNAME]
+        .filter((part): part is string => Boolean(part && part.trim()))
+        .join("\\")
+        .trim();
+      windowsServiceUser = (
+        await prompter.text({
+          message: "Windows account for Gateway Scheduled Task",
+          initialValue: process.env.OPENCLAW_WINDOWS_SERVICE_USER?.trim() || currentUser,
+          placeholder: "DOMAIN\\username or username",
+          validate: (value) =>
+            value.trim() ? undefined : "Enter a Windows username (for example: DOMAIN\\username)",
+        })
+      ).trim();
+      await prompter.note(
+        `Gateway service will run as ${windowsServiceUser}.`,
+        "Gateway service account",
+      );
+    }
+
+    const installEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...(windowsServiceUser ? { OPENCLAW_WINDOWS_SERVICE_USER: windowsServiceUser } : {}),
+    };
+
     const service = resolveGatewayService();
-    const loaded = await service.isLoaded({ env: process.env });
+    const loaded = await service.isLoaded({ env: installEnv });
     if (loaded) {
       const action = await prompter.select({
         message: "Gateway service already installed",
@@ -141,7 +167,7 @@ export async function finalizeOnboardingWizard(
           async (progress) => {
             progress.update("Restarting Gateway service…");
             await service.restart({
-              env: process.env,
+              env: installEnv,
               stdout: process.stdout,
             });
           },
@@ -152,19 +178,19 @@ export async function finalizeOnboardingWizard(
           { doneMessage: "Gateway service uninstalled." },
           async (progress) => {
             progress.update("Uninstalling Gateway service…");
-            await service.uninstall({ env: process.env, stdout: process.stdout });
+            await service.uninstall({ env: installEnv, stdout: process.stdout });
           },
         );
       }
     }
 
-    if (!loaded || (loaded && !(await service.isLoaded({ env: process.env })))) {
+    if (!loaded || (loaded && !(await service.isLoaded({ env: installEnv })))) {
       const progress = prompter.progress("Gateway service");
       let installError: string | null = null;
       try {
         progress.update("Preparing Gateway service…");
         const { programArguments, workingDirectory, environment } = await buildGatewayInstallPlan({
-          env: process.env,
+          env: installEnv,
           port: settings.port,
           token: settings.gatewayToken,
           runtime: daemonRuntime,
@@ -174,7 +200,7 @@ export async function finalizeOnboardingWizard(
 
         progress.update("Installing Gateway service…");
         await service.install({
-          env: process.env,
+          env: installEnv,
           stdout: process.stdout,
           programArguments,
           workingDirectory,
