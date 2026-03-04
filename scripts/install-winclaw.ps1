@@ -33,9 +33,30 @@ if ([string]::IsNullOrWhiteSpace($serviceUser)) {
   Write-Error "Service user cannot be empty."
   exit 1
 }
-$env:OPENCLAW_WINDOWS_SERVICE_USER = $serviceUser.Trim()
+$serviceUser = $serviceUser.Trim()
+$env:OPENCLAW_WINDOWS_SERVICE_USER = $serviceUser
 
-$repoDir = Join-Path $env:USERPROFILE "winclaw"
+function Resolve-UserProfilePath([string]$Account) {
+  $leaf = if ($Account -match "\\") { ($Account -split "\\")[-1] } else { $Account }
+  $profile = Get-CimInstance Win32_UserProfile |
+    Where-Object { $_.LocalPath -match ("\\" + [regex]::Escape($leaf) + "$") } |
+    Select-Object -First 1 -ExpandProperty LocalPath
+  if ([string]::IsNullOrWhiteSpace($profile)) {
+    return "C:\Users\$leaf"
+  }
+  return $profile
+}
+
+$serviceProfile = Resolve-UserProfilePath $serviceUser
+$serviceHome = Join-Path $serviceProfile ".openclaw"
+
+# Install/configure using the selected service user's home paths.
+$env:USERPROFILE = $serviceProfile
+$env:HOME = $serviceProfile
+$env:OPENCLAW_HOME = $serviceHome
+$env:NPM_CONFIG_PREFIX = Join-Path $serviceProfile "AppData\Roaming\npm"
+
+$repoDir = Join-Path $serviceProfile "winclaw"
 if (Test-Path $repoDir) {
   git -C $repoDir fetch origin
   git -C $repoDir reset --hard origin/main
@@ -49,4 +70,5 @@ npm install -g $repoDir
 
 Write-Host ""
 Write-Host "OPENCLAW_WINDOWS_SERVICE_USER=$($env:OPENCLAW_WINDOWS_SERVICE_USER)"
+Write-Host "OPENCLAW_HOME=$($env:OPENCLAW_HOME)"
 openclaw onboard
