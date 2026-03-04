@@ -71,4 +71,15 @@ npm install -g $repoDir
 Write-Host ""
 Write-Host "OPENCLAW_WINDOWS_SERVICE_USER=$($env:OPENCLAW_WINDOWS_SERVICE_USER)"
 Write-Host "OPENCLAW_HOME=$($env:OPENCLAW_HOME)"
+
+$configPath = Join-Path $env:OPENCLAW_HOME "openclaw.json"
+if (Test-Path $configPath) {
+  Write-Host "Existing config found at $configPath; running doctor --fix first..."
+  try {
+    openclaw doctor --fix | Out-Host
+  } catch {
+    Write-Warning "doctor --fix failed; onboarding will continue and may prompt for manual cleanup."
+  }
+}
+
 openclaw onboard
